@@ -1,5 +1,7 @@
 import os
 import ntpath
+import codecs
+
 
 class Util(object):
     @staticmethod
@@ -18,6 +20,24 @@ class Util(object):
         with open(file_path, 'a') as fw:
             fw.write(contents)
 
-if __name__ == "__main__":
-    head, tail = ntpath.split("D:\\github\\results\\IntelliMerge\\3ceb2c9453198631adf0f49afc10ece85ccfc295\\base\\src/main/java/edu/pku/intellimerge/core/SemanticGraphBuilder.java")
-    print(head)
+    @staticmethod
+    def write_content(path, content, mode='wb', encoding=None, write_none=False):
+        if content == None:
+            if write_none == True:
+                content = b''
+            else:
+                return
+        folder = os.path.dirname(path)
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+        with codecs.open(path, mode, encoding) as open_w:
+            open_w.write(content)
+
+    @staticmethod
+    def read_content(path, mode='rb'):
+        content = None
+        if os.path.exists(path):
+            with open(path, mode) as open_r:
+                content = open_r.read()
+
+        return content

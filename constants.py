@@ -4,3 +4,4 @@ class Constant(object):
     THEIRS = "theirs"
     MANUAL = "manualMerged"
     GIT = "gitMerged"
+    TEMP = "MERGEMINER"
