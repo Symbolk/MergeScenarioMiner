@@ -135,8 +135,8 @@ def git(*args):
 
 
 if __name__ == "__main__":
-    repo_name = "IntelliMerge"
-    branch_name = "ours"
+    repo_name = "javaparser"
+    branch_name = "master"
     git_url = "https://github.com/javaparser/javaparser.git"
     # Windows
     repo_dir = "D:\\github\\repos\\" + repo_name
@@ -153,7 +153,7 @@ if __name__ == "__main__":
     # some preparation works
     # clone if not exists
     if not os.path.exists(repo_dir):
-        git("clone", git_url, repo_dir)
+        git("clone", "--progress", "-v", git_url, repo_dir)
     if os.path.exists(result_dir):
         shutil.rmtree(result_dir)
     if not os.path.exists(result_dir):
