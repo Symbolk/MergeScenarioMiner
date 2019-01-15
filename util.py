@@ -9,7 +9,7 @@ class Util(object):
         head, tail = ntpath.split(file_path)
         if not os.path.exists(head):
             os.makedirs(head)
-        with open(file_path, 'w') as fw:
+        with open(file_path, 'w', encoding='utf-8') as fw:
             fw.write(contents)
 
     @staticmethod

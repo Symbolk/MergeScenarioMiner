@@ -135,8 +135,8 @@ def git(*args):
 
 
 if __name__ == "__main__":
-    repo_name = "javaparser"
-    branch_name = "master"
+    repo_name = "cassandra"
+    branch_name = "trunk"
     git_url = "https://github.com/javaparser/javaparser.git"
     # Windows
     repo_dir = "D:\\github\\repos\\" + repo_name
