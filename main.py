@@ -35,7 +35,7 @@ class GitService(object):
     def threeway_merge_content(base_content, ours_content, theirs_content):
         # deleted in ours or theirs
         if ours_content == None or theirs_content == None:
-            return None
+            return None, 0
         base_temp = os.path.join(tempfile.gettempdir(), Constant.TEMP, UUID, Constant.BASE)
         ours_temp = os.path.join(tempfile.gettempdir(), Constant.TEMP, UUID, Constant.OURS)
         theirs_temp = os.path.join(tempfile.gettempdir(), Constant.TEMP, UUID, Constant.THEIRS)
@@ -48,13 +48,13 @@ class GitService(object):
         Util.write_content(base_temp, base_content, write_none=True)
         Util.write_content(ours_temp, ours_content)
         Util.write_content(theirs_temp, theirs_content)
-        GitService.threeway_merge_file(base_temp, ours_temp, theirs_temp)
+        num_conflicts = GitService.threeway_merge_file(base_temp, ours_temp, theirs_temp)
         git_merged_content = Util.read_content(ours_temp)
         # if and only if conflicts happen
-        if git_merged_content != None and b'<<<<<<<' in git_merged_content:
-            return git_merged_content
+        if git_merged_content != None and num_conflicts > 0:
+            return git_merged_content, num_conflicts
         else:
-            return None
+            return None, 0
 
     def save_content_to_files(self, commit, relative_path, base_content, ours_content, theirs_content,
                               git_merged_content):
@@ -75,6 +75,9 @@ class GitService(object):
     # a merge scenrio contains the three way file to merge, and the merged result by git and developer
     def collect_merge_scenrios(self, commit, unmerged_blobs):
         conflict_file_paths = []
+        num_conflicts_at_commit = 0
+        num_conflicts_per_file = []
+
         for relative_path in unmerged_blobs:
             # only care about java files now
             if relative_path.endswith(".java"):
@@ -89,23 +92,29 @@ class GitService(object):
                     if stage == 3:
                         theirs_content = blob.data_stream.read()
                 # save the git merged result
-                git_merged_content = self.threeway_merge_content(base_content, ours_content, theirs_content)
+                git_merged_content, num_conflicts = self.threeway_merge_content(base_content, ours_content,
+                                                                                theirs_content)
                 if git_merged_content != None:
                     conflict_file_paths.append(relative_path)
+                    num_conflicts_at_commit += num_conflicts
+                    num_conflicts_per_file.append(str(num_conflicts))
                     self.save_content_to_files(commit, relative_path, base_content, ours_content, theirs_content,
                                                git_merged_content)
         if len(conflict_file_paths) > 0:
-            print("Commit: %s, #Unmerged_blobs: %s, #Conflict java files: %s" % (str(commit), len(unmerged_blobs),
-                                                                                 len(conflict_file_paths)))
-        return conflict_file_paths
+            print("Commit: %s, #Unmerged_blobs: %s, #Conflict java files: %s, #Conflict blocks: %s" % (
+            str(commit), len(unmerged_blobs),
+            len(conflict_file_paths), num_conflicts_at_commit))
+        return conflict_file_paths, num_conflicts_per_file
 
-    def save_four_commits(self, summary_path, file_paths, merge_commit, ours_commit, theirs_commit, base_commit):
+    def save_four_commits(self, summary_path, file_paths, num_conflicts_per_file, merge_commit, ours_commit,
+                          theirs_commit, base_commit):
         line = []
         line.append(str(merge_commit))
         line.append(str(ours_commit))
         line.append(str(theirs_commit))
         line.append(str(base_commit[0]))
         line.append(str(len(file_paths)))
+        line.append(','.join(num_conflicts_per_file))
         line.append(','.join(file_paths))
 
         with open(summary_path, 'a') as open_a:
@@ -123,10 +132,11 @@ class GitService(object):
                 # 2. get all unmerged files
                 unmerged_blobs = self.get_conflict_blobs(base_commit, ours_commit, theirs_commit)
                 # 3. re-merge java files with git, if conflicts, save the 3-way java files and manual merged result
-                conflict_file_paths = self.collect_merge_scenrios(merge_commit, unmerged_blobs)
+                conflict_file_paths, num_conflicts_per_file = self.collect_merge_scenrios(merge_commit, unmerged_blobs)
                 # 4. write related commit ids to the statistic file
                 if len(conflict_file_paths) > 0:
-                    self.save_four_commits(statistic_path, conflict_file_paths, merge_commit, ours_commit,
+                    self.save_four_commits(statistic_path, conflict_file_paths, num_conflicts_per_file, merge_commit,
+                                           ours_commit,
                                            theirs_commit, base_commit)
 
 
@@ -135,8 +145,8 @@ def git(*args):
 
 
 if __name__ == "__main__":
-    repo_name = "cassandra"
-    branch_name = "trunk"
+    repo_name = "javaparser"
+    branch_name = "master"
     git_url = "https://github.com/javaparser/javaparser.git"
     # Windows
     repo_dir = "D:\\github\\repos\\" + repo_name
@@ -156,16 +166,16 @@ if __name__ == "__main__":
         git("clone", "--progress", "-v", git_url, repo_dir)
     if os.path.exists(result_dir):
         shutil.rmtree(result_dir)
-    if not os.path.exists(result_dir):
-        os.makedirs(result_dir)
     if os.path.exists(statistic_path):
         os.remove(statistic_path)
+    if not os.path.exists(result_dir):
+        os.makedirs(result_dir)
 
     if not os.path.isfile(statistic_path):
         open_w = open(statistic_path, "w")
         # header
         open_w.write(
-            "merge commit; ours commit; theirs commit; base commit; #conflict java files; conflict java file paths")
+            "merge commit; ours commit; theirs commit; base commit; #conflict java files; #conflict blocks; conflict java file paths")
         open_w.close()
 
     git_service = GitService(repo_dir, branch_name, result_dir)
