@@ -1,4 +1,5 @@
 import os
+import csv
 from git import Repo
 from git import IndexFile
 import tempfile
@@ -12,10 +13,20 @@ UUID = str(uuid.uuid4())
 
 
 class GitService(object):
-    def __init__(self, repo_dir, branch_name, result_dir):
+    def __init__(self, repo_name, repo_dir, branch_name, result_dir):
         self.repo = Repo(repo_dir)
+        print("Ready to process repo: %s at branch: %s" % (repo_name, branch_name))
         self.branch = branch_name
         self.result_dir = result_dir
+        # preparing
+        # clone if not exists
+        if not os.path.exists(repo_dir):
+            git("clone", "--progress", "-v", git_url, repo_dir)
+        # clear the result dir
+        if os.path.exists(result_dir):
+            shutil.rmtree(result_dir)
+        if not os.path.exists(result_dir):
+            os.makedirs(result_dir)
 
     def get_conflict_blobs(self, base_commit, ours_commit, theirs_commit):
         return IndexFile.from_tree(self.repo, base_commit, ours_commit, theirs_commit).unmerged_blobs()
@@ -23,6 +34,14 @@ class GitService(object):
     def get_file_content_at_commit(self, commit, file_path):
         try:
             content = self.repo.git.show('{}:{}'.format(commit.hexsha, file_path))
+        except:
+            content = None
+        return content
+
+    # given the commit as str
+    def get_file_content_at_commit_str(self, commit, file_path):
+        try:
+            content = self.repo.git.show('{}:{}'.format(commit, file_path))
         except:
             content = None
         return content
@@ -68,7 +87,7 @@ class GitService(object):
         Util.write_content(git_merged_path, git_merged_content)
         # save the manual merged result
         manual_path = os.path.join(self.result_dir, str(commit), Constant.MANUAL, relative_path)
-        manual_content = self.get_file_content_at_commit(commit, relative_path)
+        manual_content = self.get_file_content_at_commit_str(str(commit), relative_path)
         if manual_content != None:
             Util.save_to_file(manual_path, manual_content)
 
@@ -102,8 +121,8 @@ class GitService(object):
                                                git_merged_content)
         if len(conflict_file_paths) > 0:
             print("Commit: %s, #Unmerged_blobs: %s, #Conflict java files: %s, #Conflict blocks: %s" % (
-            str(commit), len(unmerged_blobs),
-            len(conflict_file_paths), num_conflicts_at_commit))
+                str(commit), len(unmerged_blobs),
+                len(conflict_file_paths), num_conflicts_at_commit))
         return conflict_file_paths, num_conflicts_per_file
 
     def save_four_commits(self, summary_path, file_paths, num_conflicts_per_file, merge_commit, ours_commit,
@@ -120,7 +139,18 @@ class GitService(object):
         with open(summary_path, 'a') as open_a:
             open_a.write('\n' + ';'.join(line))
 
-    def collect(self, statistic_path):
+    # find and collect merge scenarios from the git commit history of a repo
+    def collect_from_repo(self, statistic_path):
+        # preparing
+        if os.path.exists(statistic_path):
+            os.remove(statistic_path)
+
+        if not os.path.isfile(statistic_path):
+            open_w = open(statistic_path, "w")
+            # header
+            open_w.write(
+                "merge commit; ours commit; theirs commit; base commit; #conflict java files; #conflict blocks; conflict java file paths")
+            open_w.close()
         # 1. get all merge commits, 2 parents and merge_base
         for commit in self.repo.iter_commits(self.branch):
             if (len(commit.parents) >= 2):
@@ -138,6 +168,23 @@ class GitService(object):
                     self.save_four_commits(statistic_path, conflict_file_paths, num_conflicts_per_file, merge_commit,
                                            ours_commit,
                                            theirs_commit, base_commit)
+
+    # collect merge scenarios given merge commits from a csv file
+    def collect_from_csv(self, csv_file):
+        if not os.path.exists(csv_file):
+            print("%s does not exist!" % csv_file)
+        processed_merge_commits = set()
+        with open(csv_file, 'r') as f:
+            reader = csv.DictReader(f, delimiter=';')
+            for row in reader:
+                merge_commit = row['merge_commit']
+                if merge_commit not in processed_merge_commits:
+                    processed_merge_commits.add(merge_commit)
+                    ours_commit = row['parent1']
+                    theirs_commit = row['parent2']
+                    base_commit = row['merge_base']
+                    unmerged_blobs = self.get_conflict_blobs(base_commit, ours_commit, theirs_commit)
+                    conflict_file_paths, num_conflicts_per_file = self.collect_merge_scenrios(merge_commit, unmerged_blobs)
 
 
 def git(*args):
@@ -158,26 +205,11 @@ if __name__ == "__main__":
     # repo_dir = "/Users/name/github/repos/" + repo_name
     # result_dir = "/Users/name/github/merges" + repo_name
 
-    statistic_path = result_dir + "/statistics.csv"
+    # statistic_path = result_dir + "/statistics.csv"
+    # git_service = GitService(repo_name, repo_dir, branch_name, result_dir)
+    # git_service.collect_from_repo(statistic_path)
 
-    # some preparation works
-    # clone if not exists
-    if not os.path.exists(repo_dir):
-        git("clone", "--progress", "-v", git_url, repo_dir)
-    if os.path.exists(result_dir):
-        shutil.rmtree(result_dir)
-    if os.path.exists(statistic_path):
-        os.remove(statistic_path)
-    if not os.path.exists(result_dir):
-        os.makedirs(result_dir)
-
-    if not os.path.isfile(statistic_path):
-        open_w = open(statistic_path, "w")
-        # header
-        open_w.write(
-            "merge commit; ours commit; theirs commit; base commit; #conflict java files; #conflict blocks; conflict java file paths")
-        open_w.close()
-
-    git_service = GitService(repo_dir, branch_name, result_dir)
-
-    git_service.collect(statistic_path)
+    result_dir = "D:\\github\\ref_conflicts\\" + repo_name
+    csv_file = "F:\\workspace\\dev\\refactoring-analysis-results\\stats\\merge_scenarios_involved_refactorings_2.csv"
+    git_service = GitService(repo_name, repo_dir, branch_name, result_dir)
+    git_service.collect_from_csv(csv_file)
