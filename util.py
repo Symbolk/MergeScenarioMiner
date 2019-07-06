@@ -21,7 +21,8 @@ class Util(object):
             fw.write(contents)
 
     @staticmethod
-    def write_content(path, content, mode='wb', encoding=None, write_none=False):
+    def write_content(path, content, mode='wb', encoding=None, write_none=True):
+        # still generate the file even it is actually deleted
         if content == None:
             if write_none == True:
                 content = b''
