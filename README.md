@@ -29,8 +29,8 @@ Date:   Sat Jul 6 17:12:25 2019 +0800
 
 ## Requirements
 
-- Windows/Linux/macOS
-- Python 2.7.15
+- Windows /Linux/macOS
+- Python 3.7
 - Git 2.18.0
 - PyCharm
 
