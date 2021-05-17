@@ -1,4 +1,4 @@
-# MergeMiner
+# MergeScenarioMiner
 
 #### A mining tool to collect merge scenarios from Git repositories. In three-way merging, each merge scenario contains the two versions to be merged (called ours and theirs respectively), and their nearest common ancestor in the commit history (called base).
 
