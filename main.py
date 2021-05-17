@@ -15,7 +15,7 @@ UUID = str(uuid.uuid4())
 
 
 class GitService(object):
-    def __init__(self, repo_name, repo_dir, branch_name, result_dir):
+    def __init__(self, repo_name, git_url, repo_dir, branch_name, result_dir):
         # preparing
         # clone if not exists
         if not os.path.exists(repo_dir):
@@ -26,9 +26,28 @@ class GitService(object):
         if not os.path.exists(result_dir):
             os.makedirs(result_dir)
         self.repo = Repo(repo_dir)
-        print("Ready to process repo: %s at branch: %s" % (repo_name, branch_name))
+        self.git_url = git_url
+        if not branch_name or len(branch_name.strip()) == 0:
+            branch_name = self.get_default_branch()
         self.branch = branch_name
         self.result_dir = result_dir
+
+        print("Ready to process repo: %s at branch: %s" % (repo_name, branch_name))
+
+    def get_default_branch(self):
+        print("Fetching remote for default branch...")
+        lines = self.repo.git.remote('show', self.git_url)
+        print(lines)
+        lines = lines.split("\n")
+        default_branch = ''
+        for line in lines:
+            if "HEAD branch" in line:
+                default_branch = line.split(":")[1].strip()
+                break
+        if default_branch == "":
+            default_branch = "master"
+        print("Default branch: " + default_branch)
+        return default_branch
 
     def get_conflict_blobs(self, base_commit, ours_commit, theirs_commit):
         return IndexFile.from_tree(self.repo, base_commit, ours_commit, theirs_commit).unmerged_blobs()
@@ -210,7 +229,7 @@ if __name__ == "__main__":
 
     # Usage1: Collect Java files involved in merge scenarios that contain merge conflict(s) from the whole commit history
     statistic_path = result_dir + "/statistics.csv"
-    git_service = GitService(repo_name, repo_dir, branch_name, result_dir)
+    git_service = GitService(repo_name, git_url, repo_dir, branch_name, result_dir)
     git_service.collect_from_repo(statistic_path)
 
     # Usage2: Collect Java files involved in merge scenarios that contain refactoring-related merge conflict(s) 
