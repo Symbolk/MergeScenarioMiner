@@ -8,7 +8,9 @@ import uuid
 import shutil
 from constants import Constant
 from util import Util
+from pathlib import Path
 
+home = str(Path.home())
 UUID = str(uuid.uuid4())
 
 
@@ -117,7 +119,7 @@ class GitService(object):
                 git_merged_content, num_conflicts = self.threeway_merge_content(base_content, ours_content,
                                                                                 theirs_content)
                 # if one side content is None, merge result will be None, but not conflicts
-                if num_conflicts > 0 and base_content!=None and base_content.strip() != "":
+                if num_conflicts > 0 and base_content != None and base_content.strip() != "":
                     conflict_file_paths.append(relative_path)
                     num_conflicts_at_commit += num_conflicts
                     num_conflicts_per_file.append(str(num_conflicts))
@@ -199,18 +201,12 @@ def git(*args):
 
 if __name__ == "__main__":
     repo_name = "javaparser"
+    # get the default branch
     branch_name = "master"
-    # if the repo is not present in the repo_dir, it will be cloned,  recommend to clone in advance
+    # if the repo is not present in the repo_dir, it will be cloned, but better to clone in advance
     git_url = "https://github.com/javaparser/javaparser.git"
-    # Windows
-    repo_dir = "D:\\github\\rep\\" + repo_name
-    result_dir = "D:\\github\\temp\\" + repo_name
-    # Linux
-    # repo_dir = "/home/github/repos/" + repo_name
-    # result_dir = "/home/github/merges" + repo_name
-    # macOS
-    # repo_dir = "/Users/name/github/repos/" + repo_name
-    # result_dir = "/Users/name/githeub/merges" + repo_name
+    repo_dir = os.path.join(home, "coding/data/repos", repo_name)
+    result_dir = os.path.join(home, "coding/data/merges", repo_name)
 
     # Usage1: Collect Java files involved in merge scenarios that contain merge conflict(s) from the whole commit history
     statistic_path = result_dir + "/statistics.csv"
