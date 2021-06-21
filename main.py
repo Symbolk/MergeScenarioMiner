@@ -134,34 +134,32 @@ class GitService(object):
             Util.save_to_file(manual_path, manual_content)
 
     # a merge scenrio contains the three way file to merge, and the merged result by git and developer
-    def collect_merge_scenrios(self, commit, unmerged_blobs):
+    def collect_merge_scenrios(self, commit, unmerged_blobs, threshold):
         conflict_file_paths = []
         num_conflicts_at_commit = 0
         num_conflicts_per_file = []
 
         for relative_path in unmerged_blobs:
-            # only care about java files now
-            if relative_path.endswith(".java"):
-                base_content = None
-                ours_content = None
-                theirs_content = None
-                for (stage, blob) in unmerged_blobs[relative_path]:
-                    if stage == 1:
-                        base_content = blob.data_stream.read()
-                    if stage == 2:
-                        ours_content = blob.data_stream.read()
-                    if stage == 3:
-                        theirs_content = blob.data_stream.read()
-                # save the git merged result
-                git_merged_content, num_conflicts = self.threeway_merge_content(base_content, ours_content,
-                                                                                theirs_content)
-                # if one side content is None, merge result will be None, but not conflicts
-                if num_conflicts > 0 and base_content != None and base_content.strip() != "":
-                    conflict_file_paths.append(relative_path)
-                    num_conflicts_at_commit += num_conflicts
-                    num_conflicts_per_file.append(str(num_conflicts))
-                    self.save_content_to_files(commit, relative_path, base_content, ours_content, theirs_content,
-                                               git_merged_content)
+            base_content = None
+            ours_content = None
+            theirs_content = None
+            for (stage, blob) in unmerged_blobs[relative_path]:
+                if stage == 1:
+                    base_content = blob.data_stream.read()
+                if stage == 2:
+                    ours_content = blob.data_stream.read()
+                if stage == 3:
+                    theirs_content = blob.data_stream.read()
+            # save the git merged result
+            git_merged_content, num_conflicts = self.threeway_merge_content(base_content, ours_content,
+                                                                            theirs_content)
+            # if one side content is None, merge result will be None, but not conflicts
+            if num_conflicts >= threshold and base_content != None and base_content.strip() != "":
+                conflict_file_paths.append(relative_path)
+                num_conflicts_at_commit += num_conflicts
+                num_conflicts_per_file.append(str(num_conflicts))
+                self.save_content_to_files(commit, relative_path, base_content, ours_content, theirs_content,
+                                           git_merged_content)
         if len(conflict_file_paths) > 0:
             print("Commit: %s, #Unmerged_blobs: %s, #Conflict java files: %s, #Conflict blocks: %s" % (
                 str(commit), len(unmerged_blobs),
@@ -183,7 +181,7 @@ class GitService(object):
             open_a.write('\n' + ';'.join(line))
 
     # find and collect merge scenarios from the git commit history of a repo
-    def collect_from_repo(self, statistic_path):
+    def collect_from_repo(self, statistic_path, threshold):
         # preparing
         if os.path.exists(statistic_path):
             os.remove(statistic_path)
@@ -194,9 +192,11 @@ class GitService(object):
             open_w.write(
                 "merge commit; ours commit; theirs commit; base commit; #conflict java files; #conflict blocks; conflict java file paths")
             open_w.close()
+        num_merge_commits = 0
         # 1. get all merge commits, 2 parents and merge_base
         for commit in self.repo.iter_commits(self.branch):
             if (len(commit.parents) >= 2):
+                num_merge_commits += 1
                 merge_commit = commit
                 # on ours, merge theirs
                 ours_commit = merge_commit.parents[0]
@@ -205,12 +205,14 @@ class GitService(object):
                 # 2. get all unmerged files
                 unmerged_blobs = self.get_conflict_blobs(base_commit, ours_commit, theirs_commit)
                 # 3. re-merge java files with git, if conflicts, save the 3-way java files and manual merged result
-                conflict_file_paths, num_conflicts_per_file = self.collect_merge_scenrios(merge_commit, unmerged_blobs)
+                conflict_file_paths, num_conflicts_per_file = self.collect_merge_scenrios(merge_commit, unmerged_blobs, threshold)
                 # 4. write related commit ids to the statistic file
                 if len(conflict_file_paths) > 0:
                     self.save_four_commits(statistic_path, conflict_file_paths, num_conflicts_per_file, merge_commit,
                                            ours_commit,
                                            theirs_commit, base_commit)
+
+        print("Total merge commits: " + str(num_merge_commits))
 
     # collect merge scenarios given merge commits from a csv file
     def collect_from_csv(self, csv_file):
@@ -237,18 +239,20 @@ def git(*args):
 
 
 if __name__ == "__main__":
-    repo_name = "cassandra"
+    repo_name = "vscode"
     # get the default branch
-    branch_name = "trunk"
+    branch_name = "main"
     # if the repo is not present in the repo_dir, it will be cloned, but better to clone in advance
     git_url = "https://github.com/apache/cassandra"
-    repo_dir = os.path.join(home, "coding/data/repos", repo_name)
-    result_dir = os.path.join(home, "coding/data/merges", repo_name)
+    repo_dir = os.path.join(home, "coding/vscode/", repo_name)
+    result_dir = os.path.join(home, "coding/data/merges2", repo_name)
+    # the minimum number of conflicting blocks
+    threshold = 5
 
     # Usage1: Collect Java files involved in merge scenarios that contain merge conflict(s) from the whole commit history
     statistic_path = result_dir + "/statistics.csv"
     git_service = GitService(repo_name, git_url, repo_dir, branch_name, result_dir)
-    git_service.collect_from_repo(statistic_path)
+    git_service.collect_from_repo(statistic_path, threshold)
 
     # Usage2: Collect Java files involved in merge scenarios that contain refactoring-related merge conflict(s) 
     # from the csv file generated by https://github.com/Symbolk/RefConfMiner.git
