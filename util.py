@@ -9,8 +9,12 @@ class Util(object):
         head, tail = ntpath.split(file_path)
         if not os.path.exists(head):
             os.makedirs(head)
-        with open(file_path, 'w', encoding='utf-8') as fw:
-            fw.write(contents)
+        try:
+            with open(file_path, 'w', encoding='utf-8') as fw:
+                fw.write(contents)
+        except UnicodeEncodeError:
+            print("Error when saving file: " + file_path)
+            return
 
     @staticmethod
     def append_to_file(file_path, contents):
