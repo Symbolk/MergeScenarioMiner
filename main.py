@@ -52,22 +52,28 @@ class GitService(object):
         print("Ready to process repo: %s at branch: %s" % (repo_name, branch_name))
 
     def get_default_branch(self):
-        if not git_url:
-            print("But git_url is empty!")
-            return
-        print("Fetching remote for default branch from: " + git_url + " (be patient)")
-
-        lines = self.repo.git.remote('show', self.git_url)
-        print(lines)
-        lines = lines.split("\n")
         default_branch = ''
-        for line in lines:
-            if "HEAD branch" in line:
-                default_branch = line.split(":")[1].strip()
-                break
+
+        if not self.repo:
+            if not git_url:
+                print("Repo does not exist but git_url is empty!")
+                return
+            print("Fetching remote for default branch from: " + git_url + " (be patient)")
+
+            lines = self.repo.git.remote('show', self.git_url)
+            print(lines)
+            lines = lines.split("\n")
+            for line in lines:
+                if "HEAD branch" in line:
+                    default_branch = line.split(":")[1].strip()
+                    break
+        else:
+            # return the current branch instead
+            default_branch = self.repo.active_branch.name
+
         if default_branch == "":
             default_branch = "master"
-        print("Got default branch: " + default_branch)
+        print("Default/Active branch: " + default_branch)
         return default_branch
 
     def get_conflict_blobs(self, base_commit, ours_commit, theirs_commit):
