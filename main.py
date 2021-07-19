@@ -1,6 +1,6 @@
 import os
 import csv
-import git
+# import git
 from git import Repo
 from git import IndexFile
 import tempfile
@@ -152,8 +152,8 @@ class GitService(object):
         if manual_content != None:
             Util.save_to_file(manual_path, manual_content)
 
-    # a merge scenrio contains the three way file to merge, and the merged result by git and developer
-    def collect_merge_scenrios(self, commit, unmerged_blobs, threshold):
+    # a merge scenarios contains the three way file to merge, and the merged result by git and developer
+    def collect_merge_scenarios(self, commit, unmerged_blobs, threshold):
         conflict_file_paths = []
         num_conflicts_at_commit = 0
         num_conflicts_per_file = []
@@ -163,12 +163,16 @@ class GitService(object):
             ours_content = None
             theirs_content = None
             for (stage, blob) in unmerged_blobs[relative_path]:
-                if stage == 1:
-                    base_content = blob.data_stream.read()
-                if stage == 2:
-                    ours_content = blob.data_stream.read()
-                if stage == 3:
-                    theirs_content = blob.data_stream.read()
+                try:
+                    if stage == 1:
+                        base_content = blob.data_stream.read()
+                    if stage == 2:
+                        ours_content = blob.data_stream.read()
+                    if stage == 3:
+                        theirs_content = blob.data_stream.read()
+                except ValueError:
+                    print('Bad SHA Error: ')
+                    print(blob)
             # save the git merged result
             git_merged_content, num_conflicts = self.threeway_merge_content(base_content, ours_content,
                                                                             theirs_content)
@@ -214,8 +218,8 @@ class GitService(object):
             # 2. get all unmerged files
             unmerged_blobs = self.get_conflict_blobs(base_commit, ours_commit, theirs_commit)
             # 3. re-merge java files with git, if conflicts, save the 3-way java files and manual merged result
-            conflict_file_paths, num_conflicts_per_file = self.collect_merge_scenrios(merge_commit, unmerged_blobs,
-                                                                                      1)
+            conflict_file_paths, num_conflicts_per_file = self.collect_merge_scenarios(merge_commit, unmerged_blobs,
+                                                                                       1)
             # 4. write related commit ids to the statistic file
             if len(conflict_file_paths) > 0:
                 self.save_four_commits(conflict_file_paths, num_conflicts_per_file, merge_commit,
@@ -239,8 +243,8 @@ class GitService(object):
                 # 2. get all unmerged files
                 unmerged_blobs = self.get_conflict_blobs(base_commit, ours_commit, theirs_commit)
                 # 3. re-merge java files with git, if conflicts, save the 3-way java files and manual merged result
-                conflict_file_paths, num_conflicts_per_file = self.collect_merge_scenrios(merge_commit, unmerged_blobs,
-                                                                                          threshold)
+                conflict_file_paths, num_conflicts_per_file = self.collect_merge_scenarios(merge_commit, unmerged_blobs,
+                                                                                           threshold)
                 # 4. write related commit ids to the statistic file
                 if len(conflict_file_paths) > 0:
                     self.save_four_commits(conflict_file_paths, num_conflicts_per_file, merge_commit,
@@ -264,8 +268,8 @@ class GitService(object):
                     theirs_commit = row['parent2']
                     base_commit = row['merge_base']
                     unmerged_blobs = self.get_conflict_blobs(base_commit, ours_commit, theirs_commit)
-                    conflict_file_paths, num_conflicts_per_file = self.collect_merge_scenrios(merge_commit,
-                                                                                              unmerged_blobs)
+                    conflict_file_paths, num_conflicts_per_file = self.collect_merge_scenarios(merge_commit,
+                                                                                               unmerged_blobs)
         print("Number of Collected Merge Commits: %s" % (len(processed_merge_commits)))
 
 
