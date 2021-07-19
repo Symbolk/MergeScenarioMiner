@@ -1,5 +1,6 @@
 import os
 import csv
+import git
 from git import Repo
 from git import IndexFile
 import tempfile
@@ -24,12 +25,13 @@ class GitService(object):
                 print("But git_url is empty!")
                 return
             else:
-                git("clone", "--progress", "-v", git_url, repo_dir)
+                git_cmd("clone", "--progress", "-v", git_url, repo_dir)
         # clear the result dir
         if os.path.exists(result_dir):
             shutil.rmtree(result_dir)
         if not os.path.exists(result_dir):
             os.makedirs(result_dir)
+        # self.repo = Repo(repo_dir, odbt=git.db.GitDB)
         self.repo = Repo(repo_dir)
         self.repo_dir = repo_dir
         self.git_url = git_url
@@ -267,7 +269,7 @@ class GitService(object):
         print("Number of Collected Merge Commits: %s" % (len(processed_merge_commits)))
 
 
-def git(*args):
+def git_cmd(*args):
     return subprocess.check_call(['git'] + list(args))
 
 
